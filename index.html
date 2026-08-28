@@ -130,7 +130,7 @@ function normalizeDateStr(dateStr) {
                 })).filter(s => s.id || s.name);
 
                 const hariIni = getTarikhHariIni();
-                todayLogs = rawLogs.filter(l => (l.date || l.tarikh || l.TARIKH) === hariIni);
+                todayLogs = rawLogs.filter(l => normalizeDateStr(l.date || l.tarikh || l.TARIKH) === hariIni);
 
                 const statusDiv = document.getElementById('status');
                 if (statusDiv.classList.contains('waiting')) {
