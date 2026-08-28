@@ -67,14 +67,31 @@
     const TEMPOH_COOLDOWN = 10000;
     let resetStatusTimer;
 
-    // FUNGSI PENYERAGAMAN TARIKH (Sentiasa DD/MM/YYYY - Cth: 15/08/2026)
-    function getTarikhHariIni() {
-        const d = new Date();
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}/${month}/${year}`;
+    // FUNGSI PENYERAGAMAN TARIKH (Format Piawai YYYY-MM-DD)
+function getTarikhHariIni() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// FUNGSI PENORMALAN TARIKH (Tukar sebarang format dari Sheets ke YYYY-MM-DD)
+function normalizeDateStr(dateStr) {
+    if (!dateStr) return '';
+    let str = String(dateStr).trim();
+    if (str.includes('T')) str = str.split('T')[0];
+    if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+            return `${year}-${month}-${day}`;
+        }
     }
+    return str;
+}
 
     // API Helper untuk Google Apps Script (Format JSON Mesra CORS)
     async function apiRequest(action, payload = {}) {
