@@ -20,7 +20,7 @@
         * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
         body { background-color: var(--bg); color: var(--primary); margin: 0; padding: 0; line-height: 1.5; }
 
-        /* Login Overlay */
+        /* Auto-Auth Overlay */
         #login-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(135deg, var(--primary) 0%, #1e293b 100%);
@@ -28,9 +28,14 @@
         }
         .login-card {
             background: var(--white); padding: 40px; border-radius: 20px;
-            box-shadow: 0 20px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center;
+            box-shadow: 0 20px 25px rgba(0,0,0,0.2); width: 100%; max-width: 420px; text-align: center;
         }
-        .login-card input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid var(--border);
+            border-top: 4px solid var(--accent); border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Top Bar */
         .top-bar {
@@ -81,7 +86,7 @@
 
         select { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); outline: none; }
 
-        /* ROLE CONTROL: Sembunyikan elemen admin apabila ID guru digunakan */
+        /* ROLE CONTROL */
         .role-teacher .admin-only { display: none !important; }
     </style>
 </head>
@@ -89,15 +94,15 @@
 
 <div id="tempQR"></div>
 
+<!-- Automatic Auth Overlay -->
 <div id="login-overlay">
     <div class="login-card">
         <img src="sas.png" alt="Logo" style="height:70px; margin-bottom:15px;" onerror="this.style.display='none'">
         <h2 style="margin-bottom:5px;">Sistem Kehadiran Murid</h2>
-        <p style="color:#64748b; font-size:0.85rem; margin-bottom:20px;">Sila log masuk ke sistem</p>
-        <p style="font-size:0.8rem; color:#64748b;">Gunakan [guru@sas.edu.my] untuk akses Guru</p>
-        <input type="email" id="userEmail" placeholder="Emel Pengguna / Guru">
-        <input type="password" id="userPass" placeholder="Kata Laluan">
-        <button onclick="handleLogin()" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:10px;">Log Masuk</button>
+        <div id="auth-status-container">
+            <div class="spinner"></div>
+            <p style="color:#64748b; font-size:0.9rem; margin:10px 0;">Memeriksa pengesahan akaun Google anda...</p>
+        </div>
     </div>
 </div>
 
@@ -106,9 +111,13 @@
         <img src="sas.png" alt="Logo" onerror="this.style.display='none'">
         <h1>SAS <span style="font-weight:400; color:#94a3b8">| Sistem Pengurusan Kehadiran Sekolah</span></h1>
     </div>
-    <div style="display:flex; gap:10px;">
+    <div style="display:flex; align-items:center; gap:15px;">
+        <div id="user-profile-badge" style="text-align:right; font-size:0.8rem;">
+            <div id="profile-name" style="font-weight:700; color:var(--primary);">--</div>
+            <div id="profile-role" style="color:#64748b; font-size:0.75rem;">--</div>
+        </div>
         <button class="btn btn-outline admin-only" onclick="backupSistem()">💾 Backup Data</button>
-        <button onclick="handleLogout()" class="btn btn-danger" style="padding: 8px 12px;">Log Keluar</button>
+        <button onclick="location.reload()" class="btn btn-outline" style="padding: 8px 12px;">🔄 Muat Semula</button>
     </div>
 </div>
 
@@ -147,30 +156,15 @@
                 <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:12px;">
                     <div>
                         <label style="display:block; margin-bottom:6px; font-weight:600; font-size:0.85rem;">ID Murid</label>
-                        <input
-                            type="text"
-                            id="newStudentId"
-                            placeholder="Contoh: 070101012233"
-                            style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none;"
-                        >
+                        <input type="text" id="newStudentId" placeholder="Contoh: 070101012233" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none;">
                     </div>
-
                     <div>
                         <label style="display:block; margin-bottom:6px; font-weight:600; font-size:0.85rem;">Nama Murid</label>
-                        <input
-                            type="text"
-                            id="newStudentName"
-                            placeholder="Contoh: Ali Bin Ahmad"
-                            style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none;"
-                        >
+                        <input type="text" id="newStudentName" placeholder="Contoh: Ali Bin Ahmad" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none;">
                     </div>
-
                     <div>
                         <label style="display:block; margin-bottom:6px; font-weight:600; font-size:0.85rem;">Kelas</label>
-                        <select
-                            id="newStudentClass"
-                            style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none; background:#fff;"
-                        >
+                        <select id="newStudentClass" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; outline:none; background:#fff;">
                             <option value="">-- Pilih Kelas --</option>
                         </select>
                     </div>
@@ -231,7 +225,6 @@
             <div class="card-header" style="flex-wrap: wrap; gap: 15px;">
                 <h2>Log Kehadiran Keseluruhan</h2>
                 <div style="display:flex; gap:10px; flex-wrap: wrap; align-items: center;">
-                    
                     <select id="analysisMode" onchange="toggleAnalysisUI()" style="padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; font-weight: 600;">
                         <option value="daily">Harian (Pilih Tarikh)</option>
                         <option value="monthly">Bulanan</option>
@@ -260,7 +253,6 @@
                     </div>
 
                     <select id="yearFilter" onchange="processAttendanceAnalysis()" style="padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc;"></select>
-                    
                     <button class="btn btn-success" onclick="exportExcel()">📊 Eksport Excel</button>
                 </div>
             </div>
@@ -273,107 +265,113 @@
         </div>
     </div>
 
-<div id="m-qr" class="section">
-    
-    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:24px; margin-bottom:24px;">
-        
-        <div class="card">
-            <div class="card-header"><h2>Gantian Kad Individu</h2></div>
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <label style="font-size:0.85rem;">Pilih Kelas & Nama:</label>
-                <select id="qrClassSelect" onchange="updateQRNameDropdown()">
-                    <option value="">-- Pilih Kelas --</option>
-                </select>
-                <select id="qrNameSelect">
-                    <option value="">-- Pilih Nama --</option>
-                </select>
-                <button class="btn btn-primary" style="justify-content:center; margin-top:10px;" onclick="printIndividual()">Jana & Cetak Kad</button>
+    <div id="m-qr" class="section">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:24px; margin-bottom:24px;">
+            <div class="card">
+                <div class="card-header"><h2>Gantian Kad Individu</h2></div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <label style="font-size:0.85rem;">Pilih Kelas & Nama:</label>
+                    <select id="qrClassSelect" onchange="updateQRNameDropdown()">
+                        <option value="">-- Pilih Kelas --</option>
+                    </select>
+                    <select id="qrNameSelect">
+                        <option value="">-- Pilih Nama --</option>
+                    </select>
+                    <button class="btn btn-primary" style="justify-content:center; margin-top:10px;" onclick="printIndividual()">Jana & Cetak Kad</button>
+                </div>
             </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header"><h2>Cetakan Mengikut Kelas</h2></div>
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <label style="font-size:0.85rem;">Pilih Kelas:</label>
-                <select id="printByClassSelect"></select>
-                <div style="height:55px;"></div>
-                <button class="btn btn-success" style="justify-content:center;" onclick="printClass()">Cetak Semua Dalam Kelas</button>
+            
+            <div class="card">
+                <div class="card-header"><h2>Cetakan Mengikut Kelas</h2></div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <label style="font-size:0.85rem;">Pilih Kelas:</label>
+                    <select id="printByClassSelect"></select>
+                    <div style="height:55px;"></div>
+                    <button class="btn btn-success" style="justify-content:center;" onclick="printClass()">Cetak Semua Dalam Kelas</button>
+                </div>
             </div>
         </div>
 
-    </div> <div class="card admin-only" style="border-top: 4px solid var(--warning);">
-        <div class="card-header"><h2>Cetakan Pukal (Satu Sekolah)</h2></div>
-        <p style="font-size:0.9rem; color:var(--secondary);">Gunakan fungsi ini hanya untuk persediaan awal tahun atau cetakan besar-besaran.</p>
-        <button class="btn btn-primary" style="background:var(--warning); width:100%; justify-content:center; border:none; padding:12px;" onclick="printBulk()">Jana Semua QR & Cetak</button>
+        <div class="card admin-only" style="border-top: 4px solid var(--warning);">
+            <div class="card-header"><h2>Cetakan Pukal (Satu Sekolah)</h2></div>
+            <p style="font-size:0.9rem; color:var(--secondary);">Gunakan fungsi ini hanya untuk persediaan awal tahun atau cetakan besar-besaran.</p>
+            <button class="btn btn-primary" style="background:var(--warning); width:100%; justify-content:center; border:none; padding:12px;" onclick="printBulk()">Jana Semua QR & Cetak</button>
+        </div>
     </div>
-
 </div>
     
 <script>
-    // --- KONFIGURASI GOOGLE SHEETS SAGE/SAS WEB APP ---
     const SAGE_URL = "https://script.google.com/macros/s/AKfycbwMcWyfOAkHawx3WjhAWQGjkB9MbbRcFkYTfDmXllz1mGKnUzB9Syi7ppsKPeDhFU2vqA/exec";
 
-    // Variable Global
     let globalStudents = [];
     let globalLogs = [];
     let myChart = null;
-    let userRole = 'admin'; 
+    let currentUser = null;
     let syncInterval = null;
 
-   // --- API HELPER FOR GOOGLE APPS SCRIPT (VERSI BAHARU) ---
-async function apiRequest(action, payload = {}) {
-    try {
-        // Gabungkan action dan data ke dalam satu objek JSON
-        const bodyData = {
-            action: action,
-            data: payload,
-            ...payload // Memastikan parameter fleksibel untuk pelbagai action
-        };
-
-        const response = await fetch(SAGE_URL, {
-            method: 'POST',
-            // Gunakan text/plain untuk mengelakkan isu CORS Preflight pada Google Apps Script
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(bodyData)
-        });
-
-        return await response.json();
-    } catch (error) {
-        console.error(`[API Error] Action '${action}':`, error);
-        return { status: "error", message: error.message };
-    }
-}
-    
-    // --- 1. LOG IN & LOG OUT LOGIC ---
-    function handleLogin() {
-        const email = document.getElementById('userEmail').value.trim().toLowerCase();
-        const pass = document.getElementById('userPass').value;
-        
-        if (!email || !pass) return alert("Sila isi emel dan kata laluan.");
-
-        if (email === "guru@sas.edu.my") {
-            userRole = 'teacher';
-            document.body.classList.add('role-teacher');
-            openTab('m-report'); 
-        } else {
-            userRole = 'admin';
-            document.body.classList.remove('role-teacher');
-            openTab('m-data'); 
+    async function apiRequest(action, payload = {}) {
+        try {
+            const bodyData = { action: action, data: payload, ...payload };
+            const response = await fetch(SAGE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(bodyData)
+            });
+            return await response.json();
+        } catch (error) {
+            console.error(`[API Error] Action '${action}':`, error);
+            return { status: "error", message: error.message };
         }
-
-        document.getElementById('login-overlay').style.display = 'none';
-        startRealtimeSync(); 
     }
 
-    function handleLogout() {
-        if (syncInterval) clearInterval(syncInterval);
-        location.reload();
+    // --- 1. AUTOMATIC SSO AUTHENTICATION ---
+    async function checkAutoAuth() {
+        const container = document.getElementById('auth-status-container');
+        try {
+            const response = await fetch(`${SAGE_URL}?action=checkAuth&_t=${new Date().getTime()}`);
+            const res = await response.json();
+
+            if (res.status === "success") {
+                currentUser = res;
+                document.getElementById('profile-name').innerText = res.nama || res.email;
+                document.getElementById('profile-role').innerText = `[${res.peranan}]`;
+
+                // Tapis Peranan Pengguna
+                const roleLower = String(res.peranan || '').toLowerCase();
+                if (roleLower === 'guru') {
+                    document.body.classList.add('role-teacher');
+                    openTab('m-report');
+                } else {
+                    document.body.classList.remove('role-teacher');
+                    openTab('m-data');
+                }
+
+                // Sembunyikan Overlay
+                document.getElementById('login-overlay').style.display = 'none';
+                startRealtimeSync();
+
+            } else {
+                // Akses Ditolak
+                container.innerHTML = `
+                    <div style="font-size:2rem; margin-bottom:10px;">❌</div>
+                    <h3 style="color:var(--danger); margin:0 0 10px;">Akses Ditolak</h3>
+                    <p style="font-size:0.85rem; color:#64748b; margin-bottom:15px;">${res.message || "Akaun anda tidak berdaftar."}</p>
+                    <button class="btn btn-outline" onclick="location.reload()">🔄 Cuba Lagi</button>
+                `;
+            }
+        } catch (err) {
+            container.innerHTML = `
+                <div style="font-size:2rem; margin-bottom:10px;">⚠️</div>
+                <h3 style="color:var(--danger); margin:0 0 10px;">Ralat Sambungan</h3>
+                <p style="font-size:0.85rem; color:#64748b; margin-bottom:15px;">${err.message}</p>
+                <button class="btn btn-primary" onclick="location.reload()">🔄 Muat Semula</button>
+            `;
+        }
     }
 
-// --- 2. DATA SYNC (GOOGLE SHEETS POLLING) ---
+    // --- 2. DATA SYNC ---
     async function fetchAllData() {
         try {
-            // SAYA UBAH BARIS INI SAHAJA: Tambah time() untuk elak cache/data sangkut
             const response = await fetch(`${SAGE_URL}?action=getAllData&_t=${new Date().getTime()}`);
             const json = await response.json();
 
@@ -407,33 +405,8 @@ async function apiRequest(action, payload = {}) {
         }
     } 
 
-
-
-// --- FUNGSI HELPER: Penormalan Tarikh ke Format YYYY-MM-DD ---
-function normalizeDateStr(dateStr) {
-    if (!dateStr) return '';
-    
-    // Jika format DD/MM/YYYY (cth: 18/08/2026 atau 18/8/2026)
-    if (dateStr.includes('/')) {
-        const parts = dateStr.split('/');
-        if (parts.length === 3) {
-            const day = parts[0].padStart(2, '0');
-            const month = parts[1].padStart(2, '0');
-            const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-            return `${year}-${month}-${day}`;
-        }
-    }
-    
-    // Jika format YYYY-MM-DD T... (ISO Date string)
-    if (dateStr.includes('T')) {
-        return dateStr.split('T')[0];
-    }
-    
-    return dateStr;
-}
     function startRealtimeSync() {
         fetchAllData();
-        // Polling automatik setiap 15 saat
         if (!syncInterval) {
             syncInterval = setInterval(fetchAllData, 15000);
         }
@@ -463,8 +436,8 @@ function normalizeDateStr(dateStr) {
 
             if (newStudents.length === 0) return alert("Tiada data sah dijumpai dalam CSV.");
 
-            const res = await apiRequest("importStudents", { students: newStudents });
-            alert(`Berjaya! ${newStudents.length} data murid telah diproses ke Google Sheets.`);
+            await apiRequest("importStudents", { students: newStudents });
+            alert(`Berjaya! ${newStudents.length} data murid telah diproses.`);
             fetchAllData();
         };
         reader.readAsText(file);
@@ -497,10 +470,7 @@ function normalizeDateStr(dateStr) {
             if (match) {
                 let yr = parseInt(match[0]);
                 if (yr < 6) {
-                    updatedStudents.push({
-                        ...s,
-                        class: s.class.replace(yr, yr + 1)
-                    });
+                    updatedStudents.push({ ...s, class: s.class.replace(yr, yr + 1) });
                 }
             }
         });
@@ -528,12 +498,9 @@ function normalizeDateStr(dateStr) {
     }
 
     const CLASS_OPTIONS = [
-        "1 CEMERLANG", "1 GEMILANG",
-        "2 CEMERLANG", "2 GEMILANG",
-        "3 CEMERLANG", "3 GEMILANG",
-        "4 CEMERLANG", "4 GEMILANG",
-        "5 CEMERLANG", "5 GEMILANG",
-        "6 CEMERLANG", "6 GEMILANG",
+        "1 CEMERLANG", "1 GEMILANG", "2 CEMERLANG", "2 GEMILANG",
+        "3 CEMERLANG", "3 GEMILANG", "4 CEMERLANG", "4 GEMILANG",
+        "5 CEMERLANG", "5 GEMILANG", "6 CEMERLANG", "6 GEMILANG"
     ];
 
     function populateAddStudentClassDropdown() {
@@ -545,20 +512,14 @@ function normalizeDateStr(dateStr) {
 
         const currentVal = sel.value;
         sel.innerHTML = '<option value="">-- Pilih Kelas --</option>';
-        options.forEach(cls => {
-            sel.innerHTML += `<option value="${cls}">${cls}</option>`;
-        });
+        options.forEach(cls => { sel.innerHTML += `<option value="${cls}">${cls}</option>`; });
         sel.value = currentVal;
     }
 
     function clearAddStudentForm() {
-        const idEl = document.getElementById('newStudentId');
-        const nameEl = document.getElementById('newStudentName');
-        const classEl = document.getElementById('newStudentClass');
-
-        if (idEl) idEl.value = '';
-        if (nameEl) nameEl.value = '';
-        if (classEl) classEl.value = '';
+        if (document.getElementById('newStudentId')) document.getElementById('newStudentId').value = '';
+        if (document.getElementById('newStudentName')) document.getElementById('newStudentName').value = '';
+        if (document.getElementById('newStudentClass')) document.getElementById('newStudentClass').value = '';
     }
 
     async function addStudentSheet() {
@@ -566,28 +527,19 @@ function normalizeDateStr(dateStr) {
         const namaMurid = (document.getElementById('newStudentName')?.value || '').trim().toUpperCase();
         const kelasMurid = (document.getElementById('newStudentClass')?.value || '').trim().toUpperCase();
 
-        if (!idMurid || !namaMurid || !kelasMurid) {
-            alert("Sila lengkapkan ID Murid, Nama Murid dan Kelas.");
-            return;
-        }
+        if (!idMurid || !namaMurid || !kelasMurid) return alert("Sila lengkapkan semua ruangan.");
 
         try {
-            await apiRequest("addStudent", {
-                id: idMurid,
-                name: namaMurid,
-                class: kelasMurid
-            });
-
+            await apiRequest("addStudent", { id: idMurid, name: namaMurid, class: kelasMurid });
             alert(`Berjaya! Murid "${namaMurid}" telah disimpan.`);
             clearAddStudentForm();
             fetchAllData();
         } catch (err) {
-            console.error(err);
             alert("Ralat simpan murid: " + err.message);
         }
     }
 
-    // --- 4. UI & PAPARAN DATA ---
+    // --- 4. UI DISPLAY ---
     function syncDropdowns() {
         const classes = [...new Set(globalStudents.map(s => s.class).filter(Boolean))].sort();
         const filters = ['classFilter', 'qrClassSelect', 'printByClassSelect', 'absentClassSelect'];
@@ -625,12 +577,6 @@ function normalizeDateStr(dateStr) {
         const targetLogs = globalLogs.filter(l => l && l.date === dateToUse);
         const classes = [...new Set(globalStudents.map(s => s.class).filter(Boolean))].sort();
 
-        const cardHeader = summaryBody.closest('.card').querySelector('h2');
-        if (cardHeader) {
-            const todayStr = new Date().toLocaleDateString('en-GB');
-            cardHeader.innerHTML = dateToUse === todayStr ? "Ringkasan Kehadiran Hari Ini" : `Ringkasan Kehadiran (${dateToUse})`;
-        }
-
         if (classes.length === 0) {
             summaryBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--secondary);">Tiada data murid.</td></tr>`;
             return;
@@ -662,7 +608,6 @@ function normalizeDateStr(dateStr) {
             absentTable.style.display = 'none';
             absentMessage.style.display = 'block';
             absentMessage.innerHTML = "Sila pilih kelas untuk menyemak senarai tidak hadir.";
-            absentMessage.style.color = "var(--secondary)";
             return;
         }
 
@@ -677,7 +622,6 @@ function normalizeDateStr(dateStr) {
             absentTable.style.display = 'none';
             absentMessage.style.display = 'block';
             absentMessage.innerHTML = "Tiada murid didaftarkan dalam kelas ini.";
-            absentMessage.style.color = "var(--secondary)";
         } else if (absentStudents.length === 0) {
             absentTable.style.display = 'none';
             absentMessage.style.display = 'block';
@@ -700,54 +644,31 @@ function normalizeDateStr(dateStr) {
         }
     }
 
-async function markAttendanceManual(studentId, studentName, studentClass) {
-    if (!confirm(`Sahkan kehadiran manual untuk ${studentName}?`)) return;
+    async function markAttendanceManual(studentId, studentName, studentClass) {
+        if (!confirm(`Sahkan kehadiran manual untuk ${studentName}?`)) return;
 
-    try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const tarikhIni = `${day}/${month}/${year}`;
-        const masaIni = now.toLocaleTimeString('en-GB', { hour12: false });
+        try {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const tarikhIni = `${day}/${month}/${year}`;
+            const masaIni = now.toLocaleTimeString('en-GB', { hour12: false });
 
-        const res = await apiRequest("addLog", {
-            idMurid: studentId,
-            studentId: studentId,
-            id: studentId,
-            nama: studentName,
-            name: studentName,
-            kelas: studentClass,
-            class: studentClass,
-            tarikh: tarikhIni,
-            date: tarikhIni,
-            masa: masaIni,
-            time: masaIni,
-            status: "HADIR"
-        });
+            const res = await apiRequest("addLog", {
+                id: studentId, name: studentName, class: studentClass,
+                date: tarikhIni, time: masaIni, status: "HADIR"
+            });
 
-        // Semak makbalas ralat dari backend
-        if (res && res.status === "error") {
-            throw new Error(res.message);
-        }
-
-        alert(`✅ Kehadiran ${studentName} direkodkan!`);
-
-        // 1. Tunggu (await) sehingga data terkini dari Google Sheets selesai dimuat turun sepenuhnya
-        if (typeof fetchAllData === 'function') {
+            if (res && res.status === "error") throw new Error(res.message);
+            alert(`✅ Kehadiran ${studentName} direkodkan!`);
             await fetchAllData();
+        } catch (err) {
+            alert("❌ Ralat berlaku: " + err.message);
         }
-
-        // 2. JIKA fungsi fetchAllData() anda TIDAK mengemaskini paparan secara automatik, 
-        // pastikan panggil fungsi render paparan anda di sini (pilih/uncomment yang berkaitan):
-        // if (typeof renderDashboard === 'function') renderDashboard();
-        // if (typeof processAttendanceAnalysis === 'function') processAttendanceAnalysis();
-
-    } catch (err) {
-        alert("❌ Ralat berlaku: " + err.message);
     }
-}
-    // --- 5. ANALISIS & GRAF KESELURUHAN ---
+
+    // --- 5. ANALISIS & GRAF ---
     function setupYearFilter() {
         let years = [...new Set(globalLogs.map(l => l.date ? l.date.split('/')[2] : null))].filter(y => y);
         const curY = new Date().getFullYear().toString();
@@ -755,9 +676,7 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
         years.sort((a,b) => b-a);
         const yf = document.getElementById('yearFilter');
         if (!yf) return;
-        const current = yf.value;
         yf.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
-        if (current) yf.value = current;
     }
 
     function toggleAnalysisUI() {
@@ -769,9 +688,7 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
             monthContainer.style.display = 'none';
             dateContainer.style.display = 'block';
             const dateInput = document.getElementById('dateFilter');
-            if (!dateInput.value) {
-                dateInput.valueAsDate = new Date();
-            }
+            if (!dateInput.value) dateInput.valueAsDate = new Date();
         } else if (mode === 'monthly') {
             dateContainer.style.display = 'none';
             monthContainer.style.display = 'block';
@@ -787,17 +704,14 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
         if (!globalLogs) return; 
 
         const modeEl = document.getElementById('analysisMode');
-        const yearFilterEl = document.getElementById('yearFilter');
-        const monthFilterEl = document.getElementById('monthFilter');
-        const dateFilterEl = document.getElementById('dateFilter');
-        
         const mode = modeEl ? modeEl.value : 'daily';
-        const selectedYear = yearFilterEl && yearFilterEl.value ? yearFilterEl.value : new Date().getFullYear().toString();
-        const selectedMonth = monthFilterEl ? monthFilterEl.value : String(new Date().getMonth() + 1).padStart(2, '0');
+        const selectedYear = document.getElementById('yearFilter')?.value || new Date().getFullYear().toString();
+        const selectedMonth = document.getElementById('monthFilter')?.value || String(new Date().getMonth() + 1).padStart(2, '0');
         
         let selectedDailyDate = new Date().toLocaleDateString('en-GB'); 
+        const dateFilterEl = document.getElementById('dateFilter');
         if (dateFilterEl && dateFilterEl.value) {
-            const d = dateFilterEl.value.split('-'); // [YYYY, MM, DD]
+            const d = dateFilterEl.value.split('-');
             selectedDailyDate = `${d[2]}/${d[1]}/${d[0]}`; 
         }
 
@@ -826,14 +740,7 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
             renderClassSummary();
         }
 
-        const sortedLogs = filteredLogs.sort((a, b) => {
-            const dateA = a.date || ''; const dateB = b.date || '';
-            if (dateA !== dateB) return dateB.localeCompare(dateA);
-            const timeA = a.time || ''; const timeB = b.time || '';
-            return timeB.localeCompare(timeA);
-        });
-        
-        renderReport(sortedLogs);
+        renderReport(filteredLogs);
     }
 
     function updateChartUI(present, absent) {
@@ -885,19 +792,7 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
         const mode = document.getElementById('analysisMode').value;
         const selYear = document.getElementById('yearFilter').value;
         let filename = `Laporan_Kehadiran_${selYear}.xlsx`;
-        let filtered = [];
-
-        if (mode === 'daily') {
-            const dInput = document.getElementById('dateFilter').value;
-            if (dInput) {
-                const d = dInput.split('-');
-                const formatD = `${d[2]}/${d[1]}/${d[0]}`;
-                filtered = globalLogs.filter(l => l.date === formatD);
-                filename = `Laporan_Harian_${dInput}.xlsx`;
-            }
-        } else {
-            filtered = globalLogs.filter(l => l.date && l.date.endsWith(selYear));
-        }
+        let filtered = globalLogs.filter(l => l.date && l.date.endsWith(selYear));
 
         const ws = XLSX.utils.json_to_sheet(filtered);
         const wb = XLSX.utils.book_new();
@@ -905,7 +800,7 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
         XLSX.writeFile(wb, filename);
     }
 
-    // --- 6. PRINTING & QR CODE ---
+    // --- 6. NAVIGASI & CETAKAN ---
     function openTab(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active-section'));
         document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
@@ -913,53 +808,29 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
         
         const tabBtn = document.getElementById('tab-' + id.split('-')[1]);
         if (tabBtn) tabBtn.classList.add('active');
-        
-        if (id === 'm-report' || id === 'm-analytics') {
-            const dateInput = document.getElementById('dateFilter');
-            if (dateInput) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                
-                dateInput.value = `${year}-${month}-${day}`;
-                dateInput.dispatchEvent(new Event('change'));
+    }
+
+    function updateQRNameDropdown() {
+        const classSelect = document.getElementById('qrClassSelect');
+        const nameSelect = document.getElementById('qrNameSelect');
+        if (!classSelect || !nameSelect) return;
+
+        const selectedClass = classSelect.value.trim().toUpperCase();
+        nameSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
+
+        if (!selectedClass) return;
+        const filtered = globalStudents.filter(s => s.class === selectedClass);
+
+        filtered.forEach(student => {
+            if (student.name) {
+                const opt = document.createElement('option');
+                opt.value = student.id;
+                opt.textContent = student.name;
+                nameSelect.appendChild(opt);
             }
-        }
+        });
     }
 
-function updateQRNameDropdown() {
-    const classSelect = document.getElementById('qrClassSelect');
-    const nameSelect = document.getElementById('qrNameSelect');
-    if (!classSelect || !nameSelect) return;
-
-    const selectedClass = classSelect.value.trim().toUpperCase();
-    nameSelect.innerHTML = '<option value="">-- Pilih Nama --</option>';
-
-    // Semak globalStudents yang diisi oleh fetchAllData()
-    if (typeof globalStudents === 'undefined' || !Array.isArray(globalStudents) || globalStudents.length === 0) {
-        console.warn("globalStudents masih kosong!");
-        return;
-    }
-
-    if (!selectedClass) return;
-
-    // Tapis murid berdasarkan s.class daripada globalStudents
-    const filtered = globalStudents.filter(s => s.class === selectedClass);
-
-    console.log(`Menjumpai ${filtered.length} murid untuk kelas: ${selectedClass}`);
-
-    // Isi pilihan nama ke dropdown
-    filtered.forEach(student => {
-        if (student.name) {
-            const opt = document.createElement('option');
-            opt.value = student.id;   // Menggunakan s.id
-            opt.textContent = student.name; // Menggunakan s.name
-            nameSelect.appendChild(opt);
-        }
-    });
-}
-    
     async function getQRImage(text) {
         return new Promise((resolve) => {
             const tempDiv = document.getElementById('tempQR');
@@ -975,103 +846,15 @@ function updateQRNameDropdown() {
     const cardStyles = `
         <style>
             @page { size: A4 portrait; margin: 8mm; }
-            body { margin: 0; font-family: 'Inter', Arial, sans-serif; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .page-title { text-align: center; font-size: 11pt; margin: 0 0 5mm 0; color: #1e293b; font-weight: bold; page-break-after: avoid; text-transform: uppercase; }
-            
-            .grid { 
-                display: grid; 
-                grid-template-columns: repeat(3, 54mm); 
-                gap: 4mm 6mm; 
-                justify-content: center; 
-                align-content: start;
-            }
-
-            .page-break { 
-                page-break-before: always; 
-                margin-top: 8mm; 
-            }
-
-            .id-card { 
-                width: 54mm; 
-                height: 85.6mm; 
-                border: 1px dashed #cbd5e1; 
-                border-radius: 3mm;
-                box-sizing: border-box; 
-                padding: 4mm 3mm; 
-                text-align: center; 
-                display: flex; 
-                flex-direction: column; 
-                align-items: center; 
-                background: #ffffff; 
-                position: relative; 
-                overflow: hidden; 
-                page-break-inside: avoid;
-            }
-
-            .school-logo { width: 14mm; height: 14mm; object-fit: contain; margin-bottom: 1mm; }
-            .school-name { font-size: 9pt; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase; line-height: 1.1; }
-            .system-title { font-size: 5.5pt; color: #2563eb; margin: 1.5mm 0 0 0; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
-            
-            .qr-space { margin: auto 0; display: flex; justify-content: center; align-items: center; }
-            .qr-space img { width: 32mm; height: 32mm; object-fit: contain; }
-
-            .student-details { width: 100%; border-top: 1.5px solid #2563eb; padding-top: 2mm; margin-top: auto; }
-            .student-name { font-size: 8pt; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase; line-height: 1.2; word-break: break-word; }
-
-            .id-card.back { text-align: left; padding: 5mm 4mm; background: #fafafa; }
-            .back-header { font-size: 8.5pt; font-weight: 800; color: #dc2626; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 1.5mm; margin-bottom: 2.5mm; text-align: center; width: 100%; }
-            .back-notes { font-size: 6.5pt; color: #334155; margin: 0; padding-left: 3.5mm; line-height: 1.45; font-weight: 500; }
-            .back-notes li { margin-bottom: 2mm; }
-            .back-footer { margin-top: auto; font-size: 6pt; text-align: center; color: #64748b; font-weight: bold; width: 100%; border-top: 1px dashed #cbd5e1; padding-top: 2mm; }
-
-            .single-layout { display: flex; justify-content: center; align-items: center; min-height: 100vh; gap: 8mm; }
+            body { margin: 0; font-family: 'Inter', Arial, sans-serif; background: #fff; }
+            .grid { display: grid; grid-template-columns: repeat(3, 54mm); gap: 4mm 6mm; justify-content: center; }
+            .id-card { width: 54mm; height: 85.6mm; border: 1px dashed #cbd5e1; border-radius: 3mm; padding: 4mm 3mm; text-align: center; display: flex; flex-direction: column; align-items: center; }
+            .school-logo { width: 14mm; height: 14mm; object-fit: contain; }
+            .school-name { font-size: 9pt; font-weight: 800; color: #0f172a; margin: 0; text-transform: uppercase; }
+            .qr-space img { width: 32mm; height: 32mm; }
+            .student-name { font-size: 8pt; font-weight: 800; color: #0f172a; text-transform: uppercase; }
         </style>
     `;
-
-    function getFrontCardHTML(studentName, qrSrc) {
-        return `
-            <div class="id-card front">
-                <img src="logo.png" class="school-logo" alt="Logo" onerror="this.style.display='none'">
-                <h1 class="school-name">SK ABANG GESA</h1>
-                <div class="system-title">Student's Attendance System ( S A S )</div>
-                <div class="qr-space"><img src="${qrSrc}"></div>
-                <div class="student-details">
-                    <div class="student-name">${studentName}</div>
-                </div>
-            </div>
-        `;
-    }
-
-    function getBackCardHTML() {
-        return `
-            <div class="id-card back">
-                <div class="back-header">📌 Peringatan</div>
-                <ul class="back-notes">
-                    <li>Setiap QR adalah unik dan khas untuk murid ini sahaja.</li>
-                    <li>Sila bawa kad ini setiap hari semasa ke sekolah.</li>
-                    <li>Pastikan keselamatan dan kondisi kad ini sepanjang masa.</li>
-                    <li>Denda <b>RM10</b> akan dikenakan untuk kad gantian.</li>
-                    <li>Jika terjumpa kad ini, sila kembalikan kepada pihak sekolah <b>(SK Abang Gesa)</b>.</li>
-                    <li>Hubungi No. Telefon: <b>0106607787</b></li>
-                </ul>
-                <div class="back-footer">HAK CIPTA TERPELIHARA SK ABANG GESA</div>
-            </div>
-        `;
-    }
-
-    function getSinglePageBackCardsHTML() {
-        let backCardsGroup = '';
-        for (let i = 0; i < 9; i++) {
-            backCardsGroup += getBackCardHTML();
-        }
-        return `
-            <div class="page-break"></div>
-            <h2 class="page-title">MUKA BELAKANG KAD (STIKER PERINGATAN - 1 HELAIAN A4)</h2>
-            <div class="grid">
-                ${backCardsGroup}
-            </div>
-        `;
-    }
 
     async function printIndividual() {
         const selectedValue = document.getElementById('qrNameSelect').value;
@@ -1082,14 +865,15 @@ function updateQRNameDropdown() {
         const src = await getQRImage(s.id || s.name);
         const win = window.open('', '', 'width=700,height=800');
         win.document.write(`
-            <html>
-                <head>${cardStyles}</head>
-                <body class="single-layout">
-                    ${getFrontCardHTML(s.name, src)}
-                    ${getBackCardHTML()}
-                    <script>setTimeout(()=>{window.print();window.close();},500);<\/script>
-                </body>
-            </html>
+            <html><head>${cardStyles}</head><body>
+            <div class="id-card">
+                <img src="logo.png" class="school-logo" onerror="this.style.display='none'">
+                <h1 class="school-name">SK ABANG GESA</h1>
+                <div class="qr-space"><img src="${src}"></div>
+                <div class="student-name">${s.name}</div>
+            </div>
+            <script>setTimeout(()=>{window.print();window.close();},500);<\/script>
+            </body></html>
         `);
     }
 
@@ -1100,41 +884,29 @@ function updateQRNameDropdown() {
         if (list.length === 0) return alert("Tiada murid!");
         
         const win = window.open('', '', 'width=900,height=1000');
-        let htmlContent = `<html><head>${cardStyles}</head><body>`;
-        
-        htmlContent += `<h2 class="page-title">MUKA DEPAN KAD: KELAS ${target}</h2><div class="grid">`;
+        let htmlContent = `<html><head>${cardStyles}</head><body><div class="grid">`;
         for (let s of list) {
             const src = await getQRImage(s.id || s.name);
-            htmlContent += getFrontCardHTML(s.name, src);
+            htmlContent += `<div class="id-card"><img src="logo.png" class="school-logo" onerror="this.style.display='none'"><h1 class="school-name">SK ABANG GESA</h1><div class="qr-space"><img src="${src}"></div><div class="student-name">${s.name}</div></div>`;
         }
-        htmlContent += `</div>`;
-        htmlContent += getSinglePageBackCardsHTML();
-        
-        htmlContent += `<script>setTimeout(()=>{window.print();window.close();},1000);<\/script></body></html>`;
+        htmlContent += `</div><script>setTimeout(()=>{window.print();window.close();},1000);<\/script></body></html>`;
         win.document.write(htmlContent);
     }
 
     async function printBulk() {
         if (globalStudents.length === 0) return alert("Tiada data!");
-        const list = [...globalStudents].sort((a, b) => {
-            if (a.class !== b.class) return a.class.localeCompare(b.class);
-            return a.name.localeCompare(b.name);
-        });
-        
         const win = window.open('', '', 'width=900,height=1000');
-        let htmlContent = `<html><head>${cardStyles}</head><body>`;
-        
-        htmlContent += `<h2 class="page-title">MUKA DEPAN KAD SEKOLAH (SEMUA MURID)</h2><div class="grid">`;
-        for (let s of list) {
+        let htmlContent = `<html><head>${cardStyles}</head><body><div class="grid">`;
+        for (let s of globalStudents) {
             const src = await getQRImage(s.id || s.name);
-            htmlContent += getFrontCardHTML(s.name, src);
+            htmlContent += `<div class="id-card"><img src="logo.png" class="school-logo" onerror="this.style.display='none'"><h1 class="school-name">SK ABANG GESA</h1><div class="qr-space"><img src="${src}"></div><div class="student-name">${s.name}</div></div>`;
         }
-        htmlContent += `</div>`;
-        htmlContent += getSinglePageBackCardsHTML();
-        
-        htmlContent += `<script>setTimeout(()=>{window.print();window.close();},1500);<\/script></body></html>`;
+        htmlContent += `</div><script>setTimeout(()=>{window.print();window.close();},1500);<\/script></body></html>`;
         win.document.write(htmlContent);
     }
+
+    // Mulakan pengesahan automatik semasa halaman dibuka
+    window.onload = checkAutoAuth;
 </script>
 </body>
 </html>
