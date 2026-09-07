@@ -388,13 +388,13 @@ async function apiRequest(action, payload = {}) {
                 })).filter(s => s.id || s.name);
 
                 globalLogs = rawLogs.map(l => ({
-                    id: String(l.id || l.ID_PELAJAR || l['ID MURID'] || '').trim(),
-                    name: String(l.name || l.NAMA || '').trim().toUpperCase(),
-                    class: String(l.class || l.KELAS || '').trim().toUpperCase(),
-                    date: String(l.date || l.TARIKH || '').trim(),
-                    time: String(l.time || l.MASA || '').trim(),
-                    status: String(l.status || 'HADIR').trim()
-                }));
+    id: String(l.id || l.ID_PELAJAR || l['ID MURID'] || '').trim(),
+    name: String(l.name || l.NAMA || '').trim().toUpperCase(),
+    class: String(l.class || l.KELAS || '').trim().toUpperCase(),
+    date: normalizeDateStr(String(l.date || l.TARIKH || '').trim()), // <-- Gunakan normalizeDateStr di sini
+    time: String(l.time || l.MASA || '').trim(),
+    status: String(l.status || 'HADIR').trim()
+}));
 
                 syncDropdowns();
                 renderStudentsTable();
@@ -618,88 +618,111 @@ function normalizeDateStr(dateStr) {
     }
 
     function renderClassSummary(targetDateStr) {
-        const summaryBody = document.getElementById('classSummaryBody');
-        if (!summaryBody) return;
+    const summaryBody = document.getElementById('classSummaryBody');
+    if (!summaryBody) return;
 
-        const dateToUse = targetDateStr || new Date().toLocaleDateString('en-GB');
-        const targetLogs = globalLogs.filter(l => l && l.date === dateToUse);
-        const classes = [...new Set(globalStudents.map(s => s.class).filter(Boolean))].sort();
+    // Sediakan tarikh penanda hari ini dalam format YYYY-MM-DD & DD/MM/YYYY
+    const now = new Date();
+    const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayDMY = now.toLocaleDateString('en-GB');
 
-        const cardHeader = summaryBody.closest('.card').querySelector('h2');
-        if (cardHeader) {
-            const todayStr = new Date().toLocaleDateString('en-GB');
-            cardHeader.innerHTML = dateToUse === todayStr ? "Ringkasan Kehadiran Hari Ini" : `Ringkasan Kehadiran (${dateToUse})`;
-        }
+    // Normanisasikan tarikh sasaran untuk perbandingan tepat
+    const normTargetDate = targetDateStr ? normalizeDateStr(targetDateStr) : todayISO;
 
-        if (classes.length === 0) {
-            summaryBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--secondary);">Tiada data murid.</td></tr>`;
-            return;
-        }
+    // Tapis log menggunakan penormalan dwi-format
+    const targetLogs = globalLogs.filter(l => {
+        if (!l || !l.date) return false;
+        const normLogDate = normalizeDateStr(l.date);
+        return normLogDate === normTargetDate || l.date === targetDateStr;
+    });
 
-        summaryBody.innerHTML = classes.map(className => {
-            const enrolmen = globalStudents.filter(s => s.class === className).length;
-            const hadir = targetLogs.filter(l => l.class === className).length;
-            const peratus = enrolmen > 0 ? ((hadir / enrolmen) * 100).toFixed(1) : 0;
+    const classes = [...new Set(globalStudents.map(s => s.class).filter(Boolean))].sort();
 
-            return `
-                <tr>
-                    <td><b>${className}</b></td>
-                    <td>${enrolmen}</td>
-                    <td><span class="badge badge-green">${hadir}</span></td>
-                    <td><b>${peratus}%</b></td>
-                </tr>
-            `;
-        }).join('');
+    const cardHeader = summaryBody.closest('.card').querySelector('h2');
+    if (cardHeader) {
+        const isToday = normTargetDate === todayISO;
+        const displayDate = targetDateStr || todayDMY;
+        cardHeader.innerHTML = isToday ? "Ringkasan Kehadiran Hari Ini" : `Ringkasan Kehadiran (${displayDate})`;
     }
 
-    function renderAbsentList() {
-        const selectedClass = document.getElementById('absentClassSelect').value;
-        const absentTable = document.getElementById('absentTable');
-        const absentMessage = document.getElementById('absentMessage');
-        const absentBody = document.getElementById('absentBody');
-
-        if (!selectedClass) {
-            absentTable.style.display = 'none';
-            absentMessage.style.display = 'block';
-            absentMessage.innerHTML = "Sila pilih kelas untuk menyemak senarai tidak hadir.";
-            absentMessage.style.color = "var(--secondary)";
-            return;
-        }
-
-        const today = new Date().toLocaleDateString('en-GB');
-        const studentsInClass = globalStudents.filter(s => s.class === selectedClass);
-        const presentLogs = globalLogs.filter(l => l.date === today && l.class === selectedClass);
-        const presentIds = presentLogs.map(l => l.id); 
-
-        const absentStudents = studentsInClass.filter(s => !presentIds.includes(s.id));
-
-        if (studentsInClass.length === 0) {
-            absentTable.style.display = 'none';
-            absentMessage.style.display = 'block';
-            absentMessage.innerHTML = "Tiada murid didaftarkan dalam kelas ini.";
-            absentMessage.style.color = "var(--secondary)";
-        } else if (absentStudents.length === 0) {
-            absentTable.style.display = 'none';
-            absentMessage.style.display = 'block';
-            absentMessage.innerHTML = "🎉 TAHNIAH! Semua murid hadir penuh hari ini.";
-            absentMessage.style.color = "var(--success)";
-        } else {
-            absentTable.style.display = 'table';
-            absentMessage.style.display = 'none';
-            
-            absentBody.innerHTML = absentStudents.sort((a,b) => a.name.localeCompare(b.name)).map((s, i) => 
-                `<tr>
-                    <td>${i+1}</td>
-                    <td><b>${s.name}</b></td>
-                    <td><span class="badge badge-red">Tiada Rekod</span></td>
-                    <td style="text-align:right">
-                        <button class="btn btn-success" style="padding:6px 12px; font-size:0.75rem;" onclick="markAttendanceManual('${s.id}', '${s.name}', '${s.class}')">✔️ Tanda Hadir</button>
-                    </td>
-                </tr>`
-            ).join('');
-        }
+    if (classes.length === 0) {
+        summaryBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--secondary);">Tiada data murid.</td></tr>`;
+        return;
     }
 
+    summaryBody.innerHTML = classes.map(className => {
+        const enrolmen = globalStudents.filter(s => s.class === className).length;
+        const hadir = targetLogs.filter(l => l.class === className).length;
+        const peratus = enrolmen > 0 ? ((hadir / enrolmen) * 100).toFixed(1) : 0;
+
+        return `
+            <tr>
+                <td><b>${className}</b></td>
+                <td>${enrolmen}</td>
+                <td><span class="badge badge-green">${hadir}</span></td>
+                <td><b>${peratus}%</b></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderAbsentList() {
+    const selectedClass = document.getElementById('absentClassSelect').value;
+    const absentTable = document.getElementById('absentTable');
+    const absentMessage = document.getElementById('absentMessage');
+    const absentBody = document.getElementById('absentBody');
+
+    if (!selectedClass) {
+        absentTable.style.display = 'none';
+        absentMessage.style.display = 'block';
+        absentMessage.innerHTML = "Sila pilih kelas untuk menyemak senarai tidak hadir.";
+        absentMessage.style.color = "var(--secondary)";
+        return;
+    }
+
+    const now = new Date();
+    const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const todayDMY = now.toLocaleDateString('en-GB');
+
+    const studentsInClass = globalStudents.filter(s => s.class === selectedClass);
+    
+    // Tapis log kehadiran hari ini dengan memadankan pelbagai bentuk format tarikh
+    const presentLogs = globalLogs.filter(l => {
+        if (!l || l.class !== selectedClass || !l.date) return false;
+        const normLogDate = normalizeDateStr(l.date);
+        return normLogDate === todayISO || l.date === todayDMY || l.date === todayISO;
+    });
+
+    const presentIds = presentLogs.map(l => String(l.id).trim());
+    const absentStudents = studentsInClass.filter(s => !presentIds.includes(String(s.id).trim()));
+
+    if (studentsInClass.length === 0) {
+        absentTable.style.display = 'none';
+        absentMessage.style.display = 'block';
+        absentMessage.innerHTML = "Tiada murid didaftarkan dalam kelas ini.";
+        absentMessage.style.color = "var(--secondary)";
+    } else if (absentStudents.length === 0) {
+        absentTable.style.display = 'none';
+        absentMessage.style.display = 'block';
+        absentMessage.innerHTML = "🎉 TAHNIAH! Semua murid hadir penuh hari ini.";
+        absentMessage.style.color = "var(--success)";
+    } else {
+        absentTable.style.display = 'table';
+        absentMessage.style.display = 'none';
+        
+        absentBody.innerHTML = absentStudents.sort((a,b) => a.name.localeCompare(b.name)).map((s, i) => 
+            `<tr>
+                <td>${i+1}</td>
+                <td><b>${s.name}</b></td>
+                <td><span class="badge badge-red">Tiada Rekod</span></td>
+                <td style="text-align:right">
+                    <button class="btn btn-success" style="padding:6px 12px; font-size:0.75rem;" onclick="markAttendanceManual('${s.id}', '${s.name}', '${s.class}')">✔️ Tanda Hadir</button>
+                </td>
+            </tr>`
+        ).join('');
+    }
+}
+    
 async function markAttendanceManual(studentId, studentName, studentClass) {
     if (!confirm(`Sahkan kehadiran manual untuk ${studentName}?`)) return;
 
@@ -795,11 +818,10 @@ async function markAttendanceManual(studentId, studentName, studentClass) {
         const selectedYear = yearFilterEl && yearFilterEl.value ? yearFilterEl.value : new Date().getFullYear().toString();
         const selectedMonth = monthFilterEl ? monthFilterEl.value : String(new Date().getMonth() + 1).padStart(2, '0');
         
-        let selectedDailyDate = new Date().toLocaleDateString('en-GB'); 
-        if (dateFilterEl && dateFilterEl.value) {
-            const d = dateFilterEl.value.split('-'); // [YYYY, MM, DD]
-            selectedDailyDate = `${d[2]}/${d[1]}/${d[0]}`; 
-        }
+        let selectedDailyDate = new Date().toISOString().split('T')[0]; 
+if (dateFilterEl && dateFilterEl.value) {
+    selectedDailyDate = dateFilterEl.value; // Nilai daripad <input type="date"> memang YYYY-MM-DD
+}
 
         let totalExpected = (globalStudents && globalStudents.length > 0) ? globalStudents.length : 242; 
         let filteredLogs = [];
